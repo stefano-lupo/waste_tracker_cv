@@ -1,10 +1,14 @@
 import sys
+import os
 import cv2 as cv
 import numpy as np
 
+OUT_DIR = "ingredients"
+
 INGREDIENTS_BY_IMAGE = [
     {
-        "filename": "img/plate.jpg",
+        "filename": "img/fish_veg/fish_veg.jpg",
+        "dishName": "Fish and Veg",
         "ingredients": [
             {
                 "name": "Carrot",
@@ -24,7 +28,8 @@ INGREDIENTS_BY_IMAGE = [
         ]
     }, 
     {
-        "filename": "img/steak_and_chips.jpeg",
+        "filename": "img/steak_chips/steak_and_chips.jpeg",
+        "dishName": "Steak and Chips",
         "ingredients": [
             {
                 "name": "Steak",
@@ -69,16 +74,29 @@ def processFilter(frame, imageIngredient):
     
     mask = cv.inRange(frame, rangeBottom, rangeTop)
     res = cv.bitwise_and(frame, frame, mask=mask)
-    cv.imshow(imageIngredient["name"], res) 
+    return res
 
 def processImg(imageIngredients):
     filename = imageIngredients["filename"]
+    dishName = imageIngredients["dishName"]
+    [path, _] = os.path.split(filename)
+
     frame = cv.imread(filename, 1)
+
     print("Processing image %s" % filename)
-    cv.imshow('Initial Dish', frame)
+    cv.imshow(dishName, frame)
 
     for imageIngredient in imageDescription["ingredients"]:
-        processFilter(frame, imageIngredient)
+        ingredientName = imageIngredient["name"]
+        result = processFilter(frame, imageIngredient)
+        cv.imshow(ingredientName, result)
+
+        ingredientsDir = os.path.join(path, OUT_DIR).replace(" ", "_")
+        if not os.path.exists(ingredientsDir):
+            os.makedirs(ingredientsDir)
+        outname = os.path.join(ingredientsDir, "%s.jpg" % ingredientName)
+        print("Writing to %s" %outname)
+        cv.imwrite(outname, result)
 
     while (1):
         if (waitForKeyPress()):
@@ -88,7 +106,9 @@ if (__name__ == "__main__"):
     if (len(sys.argv) > 1):
         filename = sys.argv[1]
         for imageDescription in INGREDIENTS_BY_IMAGE:
-            if (imageDescription["filename"] != filename):
+            imageFilename = imageDescription["filename"] 
+            print(imageFilename)
+            if (imageFilename != filename):
                 continue
             
             processImg(imageDescription)
