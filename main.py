@@ -2,48 +2,24 @@ import sys
 import cv2 as cv
 import numpy as np
 
-# cap = cv.VideoCapture(0)
-
-HUE_SPREAD = 10
-SATURATION_SPREAD = 255
-VALUE_SPREAD = 255
-
-
-def scalePercentTo(perc, scaleTo):
-    return (perc / 100) * scaleTo  
-
-# Open CV uses h[0-180], s[0-255], v[0-255]
-def hsvAnglePercentToHSV(hsv):
-    hAct = hsv[0] / 2
-    sAct = scalePercentTo(hsv[1], 255)
-    vAct = scalePercentTo(hsv[2], 255)
-    return np.array([hAct, sAct, vAct])
-
-
-def toPixel(rgb):
-    return np.uint8([[rgb]])
-
-def rgbToHsv(rgbPixel):
-    hsv = cv.cvtColor(rgbPixel, cv.COLOR_BGR2HSV)
-    # print("RGB: " + str(rgbPixel) + " --> HSV: " + str(hsv))
-    return hsv
-
-
 INGREDIENTS_BY_IMAGE = [
     {
         "filename": "img/plate.jpg",
         "ingredients": [
             {
                 "name": "Carrot",
-                "bgrMax": [43, 150, 101],
-                "bgrMin": [22, 72, 22],
-                "actualHsv": [20, 89.85, 77.25]
+                "rgbMax": [235, 136, 62],
+                "rgbMin": [190, 58, 36]
             },
             {
                 "name": "Brocolli",
-                "bgrMax": [43, 150, 101],
-                "bgrMin": [22, 72, 22],
-                "actualHsv": [68, 80.15, 51.37]
+                "rgbMax": [155, 152, 42],
+                "rgbMin": [78, 93, 19]
+            },
+            {
+                "name": "Fish",
+                "rgbMax": [217, 185, 162],
+                "rgbMin": [196, 126, 77]
             }
         ]
     }, 
@@ -52,21 +28,18 @@ INGREDIENTS_BY_IMAGE = [
         "ingredients": [
             {
                 "name": "Steak",
-                "bgrMax": [76, 78, 147],
-                "bgrMin": [23, 41, 77],
-                "actualHsv": [16.67, 46.15, 45.88]
+                "rgbMax": [147, 78, 76],
+                "rgbMin": [77, 41, 23]
             },
             {
                 "name": "Chips",
-                "bgrMax": [137, 175, 208],
-                "bgrMin": [34, 123, 188],
-                "actualHsv": [32.93, 61.57, 84.71]
+                "rgbMax": [208, 175, 137],
+                "rgbMin": [188, 123, 34],
             },
             {
                 "name": "Salad",
-                "bgrMax": [43, 150, 101],
-                "bgrMin": [22, 72, 22],
-                "actualHsv": [119.28, 51.9, 33]
+                "rgbMax": [101, 150, 43],
+                "rgbMin": [22, 72, 22],
             }
         ]
     }
@@ -79,74 +52,33 @@ def waitForKeyPress():
         return True
     return False
 
-def processFilter(frame, frameHsv, imageIngredient):
-     # define range of blue color in HSV
-    # medianHsv = rgbToHsv(toPixel(highLow["medianRgb"]))[0][0]
-    # print("Median HSV: ", medianHsv)
-    # rangeBottom = np.array([medianHsv[0]-30, 50, 50])
-    # rangeTop = np.array([medianHsv[0]+30, 255, 255])
-    
-    actualHsv = hsvAnglePercentToHSV(imageIngredient["actualHsv"])
-    bgrMin = imageIngredient["bgrMin"]
-    bgrMax = imageIngredient["bgrMax"]
-    
-    rangeTop = np.array(actualHsv)
-    # rangeTop = rangeTop + [HUE_SPREAD, SATURATION_SPREAD, VALUE_SPREAD]
-    # rangeTop[0] = rangeTop[0] + COLOUR_SPREAD
-    # rangeTop[1] = rangeTop[1]
-    # rangeTop[2] = 255
+def processFilter(frame, imageIngredient):
+    ingredientName = imageIngredient["name"]
 
-    rangeBottom = np.array(actualHsv)
-    # rangeTop = rangeTop + [HUE_SPREAD, SATURATION_SPREAD, VALUE_SPREAD]
-    # rangeBottom[0] = rangeBottom[0] - COLOUR_SPREAD
-    # rangeBottom[1] = 100
-    # rangeBottom[2] = 100
-
+    # OpenCV uses BGR instead of RGB so need to reverse these
+    bgrMin = imageIngredient["rgbMin"][::-1]
+    bgrMax = imageIngredient["rgbMax"][::-1]
+    
     rangeBottom = np.array(bgrMin, dtype = "uint8")
     rangeTop = np.array(bgrMax, dtype = "uint8")
-
-    print("\n" + imageIngredient["name"])
-    print("range bottom: ", rangeBottom)
-    print("range top: ", rangeTop)
-    # print("highRgb: ", highRgb)
-    # print("lowRgb: ", lowRgb)
-    # print(frameHsv)
     
-    # Threshold the HSV image to get only blue colors
-    mask = cv.inRange(frameHsv, rangeBottom, rangeTop)
-    # print(mask)
-    # print(lowRgb)
-    # print(highRgb)
-    # print(frameHsv)
-
-    # Bitwise-AND mask and original image
-    res = cv.bitwise_and(frame,frame, mask=mask)
-    # cv.imshow('mask',mask)
-    cv.imshow(imageIngredient["name"],res)
-
-
-def processFrame(frame, imageDescription):
-     # Convert BGR to HSV
-    # frameHsv = rgbToHsv(frame)
-    cv.imshow('frame',frame)
-
-    for imageIngredient in imageDescription["ingredients"]:
-        processFilter(frame, frame, imageIngredient)
-
-# def processCam():
-#     while 1:
-#         # Take each frame
-#         _, frame = cap.read()
-
-#         processFrame(frame)   
-
-#         if waitForKeyPress():
-#             break
-  
+    rgbStr = "(r:{0}, g:{1}, b:{2})"
+    rangeBottomString = rgbStr.format(*bgrMin[::-1])
+    rangeTopString = rgbStr.format(*bgrMax[::-1])
+    print("%s: %s - %s" % (ingredientName, rangeBottomString, rangeTopString))
+    
+    mask = cv.inRange(frame, rangeBottom, rangeTop)
+    res = cv.bitwise_and(frame, frame, mask=mask)
+    cv.imshow(imageIngredient["name"], res) 
 
 def processImg(imageIngredients):
-    frame = cv.imread(imageIngredients["filename"], 1)
-    processFrame(frame, imageIngredients)
+    filename = imageIngredients["filename"]
+    frame = cv.imread(filename, 1)
+    print("Processing image %s" % filename)
+    cv.imshow('Initial Dish', frame)
+
+    for imageIngredient in imageDescription["ingredients"]:
+        processFilter(frame, imageIngredient)
 
     while (1):
         if (waitForKeyPress()):
@@ -163,6 +95,6 @@ if (__name__ == "__main__"):
             exit
         print("Unable to find image ingredient data for %s", filename)
     else:
-        processCam()
+        print("No file specified")
     
     cv.destroyAllWindows()
